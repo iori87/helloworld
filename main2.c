@@ -19,48 +19,34 @@ int get_dev_info(gchar * device_name){
   printf("Device card: %s\n", cap.card);
   printf("Device driver: %s\n", cap.driver);
   printf("Device bus: %s\n", cap.bus_info);  
-  printf("Device capabilities flag status: %p\n", (void*)cap.capabilities);
-  int bit_mask=1;
-  if(cap.capabilities & bit_mask)
+  printf("Device capabilities flag status: %p\n", (void*)cap.capabilities);  
+  if(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)
     printf("Video Capture supported \n");
-  bit_mask=2;
-  if(cap.capabilities & bit_mask)
+  if(cap.capabilities & V4L2_CAP_VIDEO_OUTPUT)
     printf("Video Output supported \n");
-  bit_mask=4;
-  if(cap.capabilities & bit_mask)
+  if(cap.capabilities & V4L2_CAP_VIDEO_OVERLAY)
     printf("Video Overlay supported \n");
-  bit_mask=16;
-  if(cap.capabilities & bit_mask)
-    printf("Raw VBI capture supported \n");
-  bit_mask=32;
-  if(cap.capabilities & bit_mask)
+  if(cap.capabilities & V4L2_CAP_VBI_CAPTURE)
+    printf("Raw VBI capture supported \n");  
+  if(cap.capabilities & V4L2_CAP_VBI_OUTPUT)
     printf("Raw VBI output supported \n");
-  bit_mask=64;
-  if(cap.capabilities & bit_mask)
+  if(cap.capabilities & V4L2_CAP_SLICED_VBI_CAPTURE)
     printf("Sliced VBI capture supported \n");
-  bit_mask=128;
-  if(cap.capabilities & bit_mask)
+  if(cap.capabilities & V4L2_CAP_SLICED_VBI_OUTPUT)
     printf("Sliced VBI output supported \n");
-  bit_mask=512;
-  if(cap.capabilities & bit_mask)
+  if(cap.capabilities & V4L2_CAP_VIDEO_OUTPUT_OVERLAY)
     printf("Video output overlay OSD supported \n");
-  bit_mask=0x00010000;
-  if(cap.capabilities & bit_mask)
+  if(cap.capabilities & V4L2_CAP_TUNER)
     printf("Tuner or modulator supported \n");
-  bit_mask=0x00020000;
-  if(cap.capabilities & bit_mask)
+  if(cap.capabilities & V4L2_CAP_AUDIO)
     printf("Audio supported \n");
-  bit_mask=0x00040000;
-  if(cap.capabilities & bit_mask)
+  if(cap.capabilities & V4L2_CAP_RADIO)
     printf("Radio receiver supported \n");
-  bit_mask=0x01000000;
-  if(cap.capabilities & bit_mask)
+  if(cap.capabilities & V4L2_CAP_READWRITE)
     printf("Read and write I/O methods supported \n");
-  bit_mask=0x02000000;
-  if(cap.capabilities & bit_mask)
+  if(cap.capabilities & V4L2_CAP_ASYNCIO)
     printf("Asynchronous I/O methods supported \n");
-  bit_mask=0x04000000;
-  if(cap.capabilities & bit_mask)
+  if(cap.capabilities & V4L2_CAP_STREAMING)
     printf("Streaming I/O methods supported \n");
   return 1; 
 }
