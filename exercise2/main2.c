@@ -49,7 +49,7 @@ int get_dev_info(gchar * device_name){
   if(cap.capabilities & V4L2_CAP_STREAMING)
     printf("Streaming I/O methods supported \n");
   /*Exercise 2 starts here.*/  
-  struct v4l2_format format;
+ /* struct v4l2_format format;
   format.type=V4L2_BUF_TYPE_VIDEO_CAPTURE;
   ioctl(descriptor,VIDIOC_G_FMT,&format);
   struct v4l2_pix_format p_format;
@@ -60,12 +60,26 @@ int get_dev_info(gchar * device_name){
   int i;
   for(i=0;i<4;i++)
     printf("%c",code[i]);
-  printf("\n");
-  int a = V4L2_PIX_FMT_RGB332;
-  code = (char*)& a; //verify if the printing algorithm is correct (so it seems)
-  for(i=0;i<4;i++)
-    printf("%c",code[i]);
-  printf("\n");
+  printf("\n");*/
+  struct v4l2_fmtdesc  vfd;
+  vfd.type=V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  vfd.index=0;
+  struct v4l2_frmsizeenum vfse;
+  vfse.index=0;
+  while(!ioctl(descriptor,VIDIOC_ENUM_FMT,&vfd)){ 
+    vfd.index++;  
+    printf("{ pixelformat = '%c%c%c%c', description = '%s' }\n",
+	    vfd.pixelformat & 0xFF, (vfd.pixelformat >> 8) & 0xFF,
+	    (vfd.pixelformat >> 16) & 0xFF, (vfd.pixelformat >> 24) & 0xFF,
+		vfd.description);
+    vfse.pixel_format=vfd.pixelformat;
+    while(!ioctl(descriptor,VIDIOC_ENUM_FRAMESIZES,&vfse)){      
+      printf("{ Frame Resolution = %u x %u }\n", vfse.discrete.width, vfse.discrete.height);
+      vfse.index++;
+    }
+  }
+  
+  
   
   return 1; 
 }
