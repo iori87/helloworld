@@ -97,8 +97,8 @@ typedef struct PacketQueue {
 #define SUBPICTURE_QUEUE_SIZE 4
 
 typedef struct VideoPicture {
-    double pts;                                  ///<presentation time stamp for this picture
-    double target_clock;                         ///<av_gettime() time at which this should be displayed ideally
+    int64_t pts;                                  ///<presentation time stamp for this picture
+    int64_t target_clock;                         ///<av_gettime() time at which this should be displayed ideally
     int64_t pos;                                 ///<byte position in file
     SDL_Overlay *bmp;
     int width, height; /* source height & width */
@@ -112,7 +112,7 @@ typedef struct VideoPicture {
 } VideoPicture;
 
 typedef struct SubPicture {
-    double pts; /* presentation time stamp for this picture */
+    int64_t pts; /* presentation time stamp for this picture */
     AVSubtitle sub;
 } SubPicture;
 
@@ -680,7 +680,7 @@ static void video_image_display(VideoState *is)
             {
                 sp = &is->subpq[is->subpq_rindex];
 
-                if (vp->pts >= sp->pts + ((float) sp->sub.start_display_time / 1000))
+                if (vp->pts >= sp->pts + (av_rescale(sp->sub.start_display_time,1, 1000)));
                 {
                     SDL_LockYUVOverlay (vp->bmp);
 
@@ -988,7 +988,7 @@ static int64_t get_external_clock(VideoState *is)
 }
 
 /* get the current master clock value */
-static double get_master_clock(VideoState *is)
+static int64_t get_master_clock(VideoState *is)
 {
     int64_t val;
 
@@ -1025,11 +1025,11 @@ static void stream_seek(VideoState *is, int64_t pos, int64_t rel, int seek_by_by
 static void stream_pause(VideoState *is)
 {
     if (is->paused) {
-        is->frame_timer += av_gettime() / 1000000.0 + is->video_current_pts_drift - is->video_current_pts;
+        is->frame_timer += av_rescale(av_gettime(),1, 1000000) + is->video_current_pts_drift - is->video_current_pts;
         if(is->read_pause_return != AVERROR(ENOSYS)){
-            is->video_current_pts = is->video_current_pts_drift + av_gettime() / 1000000.0;
+            is->video_current_pts = is->video_current_pts_drift + av_rescale(av_gettime(),1, 1000000);
         }
-        is->video_current_pts_drift = is->video_current_pts - av_gettime() / 1000000.0;
+        is->video_current_pts_drift = is->video_current_pts - av_rescale(av_gettime(),1,1000000);
     }
     is->paused = !is->paused;
 }
@@ -1059,7 +1059,7 @@ static int64_t compute_target_time(int64_t frame_current_pts, VideoState *is)
            delay to compute the threshold. I still don't know
            if it is the best guess */
         sync_threshold = FFMAX(AV_SYNC_THRESHOLD, delay);
-        if (fabs(diff) < AV_NOSYNC_THRESHOLD) {
+        if (abs(diff) < AV_NOSYNC_THRESHOLD) {
             if (diff <= -sync_threshold)
                 delay = 0;
             else if (diff >= sync_threshold)
@@ -1068,7 +1068,7 @@ static int64_t compute_target_time(int64_t frame_current_pts, VideoState *is)
     }
     is->frame_timer += delay;
 
-    av_dlog(NULL, "video: delay=%0.3f pts=%0.3f A-V=%f\n",
+    av_dlog(NULL, "video: delay=%"PRId64" pts=%"PRId64" A-V=%"PRId64"\n",
             delay, frame_current_pts, -diff);
 
     return is->frame_timer;
@@ -1087,8 +1087,8 @@ retry:
         if (is->pictq_size == 0) {
             //nothing to do, no picture to display in the que
         } else {
-            double time= av_gettime()/1000000.0;
-            double next_target;
+            int64_t time= av_rescale(av_gettime(),1,1000000);
+            int64_t next_target;
             /* dequeue the picture */
             vp = &is->pictq[is->pictq_rindex];
 
@@ -1146,8 +1146,8 @@ retry:
                         else
                             sp2 = NULL;
 
-                        if ((is->video_current_pts > (sp->pts + ((float) sp->sub.end_display_time / 1000)))
-                                || (sp2 && is->video_current_pts > (sp2->pts + ((float) sp2->sub.start_display_time / 1000))))
+                        if ((is->video_current_pts > (sp->pts + (av_rescale(sp->sub.end_display_time,1,1000))))
+                                || (sp2 && is->video_current_pts > (sp2->pts + (av_rescale(sp2->sub.start_display_time,1,1000))))
                         {
                             free_subpicture(sp);
 
@@ -1207,8 +1207,8 @@ retry:
             av_diff = 0;
             if (is->audio_st && is->video_st)
                 av_diff = get_audio_clock(is) - get_video_clock(is);
-            printf("%d A-V:%d s:%3.1f aq=%5dKB vq=%5dKB sq=%5dB f=%"PRId64"/%"PRId64"   \r",
-                   get_master_clock(is), av_diff, FFMAX(is->skip_frames-1, 0), aqsize / 1024, vqsize / 1024, sqsize, is->pts_ctx.num_faulty_dts, is->pts_ctx.num_faulty_pts);
+            printf("%"PRId64" A-V:%"PRId64" s:%"PRId64" aq=%5dKB vq=%5dKB sq=%5dB f=%"PRId64"/%"PRId64"   \r",
+                   get_master_clock(is), av_diff, FFMAX(is->skip_frames-1, 0), av_rescale(aqsize,1,1024), av_rescale(vqsize,1,1024), sqsize, is->pts_ctx.num_faulty_dts, is->pts_ctx.num_faulty_pts);
             fflush(stdout);
             last_time = cur_time;
         }
@@ -1315,7 +1315,7 @@ static void alloc_picture(void *opaque)
  *
  * @param pts the dts of the pkt / pts of the frame and guessed if not known
  */
-static int queue_picture(VideoState *is, AVFrame *src_frame, double pts, int64_t pos)
+static int queue_picture(VideoState *is, AVFrame *src_frame, int64_t pts, int64_t pos)
 {
     VideoPicture *vp;
 #if CONFIG_AVFILTER
@@ -1438,9 +1438,9 @@ static int queue_picture(VideoState *is, AVFrame *src_frame, double pts, int64_t
  * compute the exact PTS for the picture if it is omitted in the stream
  * @param pts1 the dts of the pkt / pts of the frame
  */
-static int output_picture2(VideoState *is, AVFrame *src_frame, double pts1, int64_t pos)
+static int output_picture2(VideoState *is, AVFrame *src_frame, int64_t pts1, int64_t pos)
 {
-    double frame_delay, pts;
+    int64_t frame_delay, pts;
 
     pts = pts1;
 
@@ -1454,7 +1454,7 @@ static int output_picture2(VideoState *is, AVFrame *src_frame, double pts1, int6
     frame_delay = av_q2d(is->video_st->codec->time_base);
     /* for MPEG2, the frame can be repeated, so we update the
        clock accordingly */
-    frame_delay += src_frame->repeat_pict * (frame_delay * 0.5);
+    frame_delay += av_rescale(src_frame->repeat_pict, av_rescale(frame_delay , 0.5, 1),1);
     is->video_clock += frame_delay;
 
     return queue_picture(is, src_frame, pts, pos);
@@ -1484,7 +1484,7 @@ static int get_video_frame(VideoState *is, AVFrame *frame, int64_t *pts, AVPacke
         init_pts_correction(&is->pts_ctx);
         is->frame_last_pts = AV_NOPTS_VALUE;
         is->frame_last_delay = 0;
-        is->frame_timer = (double)av_gettime() / 1000000.0;
+        is->frame_timer = av_rescale(av_gettime(),1,1000000);
         is->skip_frames = 1;
         is->skip_frames_index = 0;
         return 0;
@@ -1756,7 +1756,7 @@ static int video_thread(void *arg)
     VideoState *is = arg;
     AVFrame *frame= avcodec_alloc_frame();
     int64_t pts_int;
-    double pts;
+    int64_t pts;
     int ret;
 
 #if CONFIG_AVFILTER
@@ -1846,7 +1846,7 @@ static int subtitle_thread(void *arg)
     SubPicture *sp;
     AVPacket pkt1, *pkt = &pkt1;
     int got_subtitle;
-    double pts;
+    int64_t pts;
     int i, j;
     int r, g, b, y, u, v, a;
 
@@ -1988,7 +1988,7 @@ static int synchronize_audio(VideoState *is, short *samples,
                         samples_size = wanted_size;
                     }
                 }
-                av_dlog(NULL, "diff=%d adiff=%d sample_diff=%d apts=%d vpts=%d %d\n",
+                av_dlog(NULL, "diff=%"PRId64" adiff=%"PRId64" sample_diff=%"PRId64" apts=%"PRId64" vpts=%"PRId64" %"PRId64"\n",
                         diff, avg_diff, samples_size - samples_size1,
                         is->audio_clock, is->video_clock, is->audio_diff_threshold);
             }
@@ -2076,12 +2076,11 @@ static int audio_decode_frame(VideoState *is, int64_t *pts_ptr)
             pts = is->audio_clock;
             *pts_ptr = pts;
             n = 2 * dec->channels;
-            is->audio_clock += (double)data_size /
-                (double)(n * dec->sample_rate);
+            is->audio_clock += av_rescale(data_size,1,(n * dec->sample_rate));
 #ifdef DEBUG
             {
                 static int64_t last_clock;
-                printf("audio: delay=%d clock=%d pts=%d\n",
+                printf("audio: delay=%"PRId64" clock=%"PRId64" pts=%"PRId64"\n",
                        is->audio_clock - last_clock,
                        is->audio_clock, pts);
                 last_clock = is->audio_clock;
@@ -2412,8 +2411,8 @@ static int decode_thread(void *arg)
             timestamp += ic->start_time;
         ret = avformat_seek_file(ic, -1, INT64_MIN, timestamp, INT64_MAX, 0);
         if (ret < 0) {
-            fprintf(stderr, "%s: could not seek to position %0.3f\n",
-                    is->filename, (double)timestamp / AV_TIME_BASE);
+            fprintf(stderr, "%s: could not seek to position %"PRId64"\n",
+                    is->filename, timestamp / AV_TIME_BASE);
         }
     }
 
@@ -2560,7 +2559,7 @@ static int decode_thread(void *arg)
         /* check if packet is in play range specified by user, then queue, otherwise discard */
         pkt_in_play_range = duration == AV_NOPTS_VALUE ||
                 (pkt->pts - ic->streams[pkt->stream_index]->start_time) *
-                av_rescale(ic->streams[pkt->stream_index]->time_base->num, 1, ic->streams[pkt->stream_index]->time_base->den) - //not sure about this
+                av_rescale(ic->streams[pkt->stream_index]->time_base.num, 1, ic->streams[pkt->stream_index]->time_base.den) - //not sure about this
                 av_rescale((start_time != AV_NOPTS_VALUE ? start_time : 0),1,1000000)
                 <= av_rescale(duration,1,1000000);
         if (pkt->stream_index == is->audio_stream && pkt_in_play_range) {
