@@ -8,8 +8,6 @@
 #include <libv4l2.h>
 #include <linux/videodev2.h>
 
-
-
 int get_dev_info(gchar * device_name){
   struct v4l2_capability cap;
   printf("Device name: %s \n", device_name);
@@ -47,7 +45,28 @@ int get_dev_info(gchar * device_name){
   if(cap.capabilities & V4L2_CAP_ASYNCIO)
     printf("Asynchronous I/O methods supported \n");
   if(cap.capabilities & V4L2_CAP_STREAMING)
-    printf("Streaming I/O methods supported \n");
+    printf("Streaming I/O methods supported \n");  
+  struct v4l2_fmtdesc  vfd;
+  vfd.type=V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  vfd.index=0;
+  struct v4l2_frmsizeenum vfse;
+  vfse.index=0;  
+  while(!ioctl(descriptor,VIDIOC_ENUM_FMT,&vfd)){ 
+    vfd.index++;  
+    printf("{ pixelformat = '%c%c%c%c', description = '%s' }\n",
+	    vfd.pixelformat & 0xFF, (vfd.pixelformat >> 8) & 0xFF,
+	    (vfd.pixelformat >> 16) & 0xFF, (vfd.pixelformat >> 24) & 0xFF,
+		vfd.description);
+    if(vfd.flags & V4L2_FMT_FLAG_COMPRESSED)
+      printf("This format is compressed\n");
+    if(vfd.flags & V4L2_FMT_FLAG_EMULATED)
+      printf("This format is not native but emulated\n");    
+    vfse.pixel_format=vfd.pixelformat;    
+    while(!ioctl(descriptor,VIDIOC_ENUM_FRAMESIZES,&vfse)){      
+      printf("{ Frame Resolution = %u x %u }\n", vfse.discrete.width, vfse.discrete.height);
+      vfse.index++;
+    }
+  } 
   return 1; 
 }
 
